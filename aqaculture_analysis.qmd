@@ -1,0 +1,36 @@
+---
+title: "EEZs for Aquaculture on the West Coast"
+author: "Lauren Puffer"
+date: "2025-11-09"
+format: html
+editor: visual
+embed-resources: true
+page-loading: false
+code-fold: show
+execute: 
+  warning: false
+  message: false
+toc: TRUE
+theme: journal
+---
+
+## Introduction
+
+## Load libraries
+
+```{r}
+library(tidyverse)
+library(sf)
+library(terra)
+library(tmap)
+library(patchwork)
+```
+
+You can add options to executable code like this
+
+```{r}
+#| echo: false
+2 * 2
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
