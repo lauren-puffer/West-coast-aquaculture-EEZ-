@@ -14,9 +14,9 @@ toc: TRUE
 theme: journal
 ---
 
-## Introduction
+# Introduction
 
-## Load libraries
+# Load libraries
 
 ```{r}
 library(tidyverse)
@@ -24,13 +24,254 @@ library(sf)
 library(terra)
 library(tmap)
 library(patchwork)
+library(here)
+library(dplyr)
 ```
 
-You can add options to executable code like this
+# Load data
+
+SST files used:
+
+-   `average_annual_sst_2008.tif`
+
+-   `average_annual_sst_2009.tif`
+
+-   `average_annual_sst_2010.tif`
+
+-   `average_annual_sst_2011.tif`
+
+-   `average_annual_sst_2012.tif`
+
+Bathymetry files used:
+
+-   depth.tif
+
+## Exclusive Economic Zones
+
+Exclusive Economic Zones files used:
+
+-   wc_regions_clean.shp
 
 ```{r}
-#| echo: false
-2 * 2
+# Read in shapefile of EEZs
+eez <- st_read(here("data", "wc_regions_clean.shp"))
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+## Sea surface temperature
+
+```{r}
+# Read in rasters of sea surface temerpature
+
+sst_2008 <- rast(here("data", "average_annual_sst_2008.tif"))
+sst_2009 <- rast(here("data", "average_annual_sst_2009.tif"))
+sst_2010 <- rast(here("data", "average_annual_sst_2010.tif"))
+sst_2011 <- rast(here("data", "average_annual_sst_2011.tif"))
+sst_2012 <- rast(here("data", "average_annual_sst_2012.tif"))
+```
+
+## Bathymetry
+
+```{r}
+# read in raster for depth
+bath <- rast(here("data", "depth.tif"))
+```
+
+## Oysters
+
+-   sea surface temperature: 11-30°C
+
+-   depth: 0-70 meters below sea level
+
+## Stack rasters
+
+```{r}
+# Use c() to stack
+sst_stack <- c(sst_2008, 
+              sst_2009, 
+              sst_2010,
+              sst_2011, 
+              sst_2012)
+```
+
+## Calculate mean
+
+```{r}
+# Get the mean of each of the cell values
+sst_mean <- mean(sst_stack)
+
+# Globally subtract 273.15
+sst_c_mean <- sst_mean - 273.15   # subtract 273.15 from every cell
+```
+
+## Reproject bathymetry
+
+```{r}
+# Reproject to SST crs
+bath_reproj <- project(bath, crs(sst_c_mean))
+
+# Check that the rasters match
+crs(bath_reproj) == crs(sst_c_mean)
+```
+
+Resample the bathymetry raster to the sea surface temperature.
+
+```{r}
+# Resample to SST
+bath_aligned <- resample(bath_reproj, sst_c_mean)
+
+# Check the extent
+ext(bath_aligned) == ext(sst_c_mean)
+
+# Check the resolution
+res(bath_aligned) == res(sst_2008)
+```
+
+Create a matrix of oyster sea surface temperature threshold, and oyster depth range.
+
+```{r}
+# Matrix of SST rang
+sst_osyter_matrix <- matrix(c(
+  -Inf, 11, 0,
+  11, 30, 1,
+  30, Inf, 0),
+ncol = 3,
+byrow = TRUE)
+  
+# Matrix of depth range
+depth_oyster_matrix <- matrix(c(
+  -Inf, -70, 0,
+  -70, 0, 1,
+  0, Inf, 0),
+  ncol = 3,
+  byrow = TRUE
+)
+```
+
+Reclassify the raster with the matrix.
+
+```{r}
+# Reclassify
+sst_reclassify <- classify(sst_c_mean, sst_osyter_matrix)
+bath_reclassify <- classify(bath_aligned, depth_oyster_matrix)
+```
+
+Multiply the rasters by eachother.
+
+```{r}
+# Multiply the reclassified rasters by eachother
+multiplied <- sst_reclassify * bath_reclassify
+
+# Change multiplied raster 0's to NAs
+multiplied[multiplied == 0 ] <- NA
+
+# Plot suitable cells
+plot(multiplied)
+```
+
+## Make a mask of EEZ
+
+```{r}
+# Reproject EEZ to SST
+eez_proj <- st_transform(eez, crs(multiplied))
+
+# Check the CRS
+crs(multiplied) == crs(eez_proj)
+```
+
+## Crop suitable cells to EEZ
+
+```{r}
+# Crop suitable cells to EEZ
+multiplied_crop <- crop(multiplied, eez_proj)
+
+# Plot the cropped 
+plot(multiplied_crop)
+
+# Rasterize the EEZ
+eez_rast <- rasterize(eez_proj, multiplied_crop, field = "area_km2")
+```
+
+## Calculate zonal statistics 
+
+```{r}
+# Compue the area covered by each raster cell in km2
+multiplied_crop_area <- cellSize(multiplied_crop, mask = TRUE, unit = "km")
+
+# Calculate zonal statistics of cropped raster with EEZ raster
+suitable_zonal <- zonal(multiplied_crop_area,eez_rast, fun = "sum", 
+                        na.rm = TRUE) # remove NAs
+
+# Use cbin to bring in
+zones_bind <- cbind(eez_proj, suitable_zonal)
+
+# Keep only the useful columns
+zones_clean <- zones_bind |>
+  select(rgn, area_km2, area_km2.1) |>
+  rename(region = rgn, 
+         total_area = area_km2, 
+         area_suitable = area_km2.1)
+```
+
+## Map of suitable area per EEZ
+
+```{r}
+# Make a map of suitable area within Economic Zones
+tm_shape(zones_clean)+
+  tm_graticules()+
+  tm_polygons(fill = "area_suitable")
+```
+
+# Function from suitable area workflow
+
+We must repeat the process above in a generalizable function in order to be able to pass any species information through and get the same result.
+
+To break down the process, our code needs to...
+
+Take the inputs of 1) a raster with mean SST, 2) a raster of depth, 3) a shapefile, 4) max and min sst, 5) max and min sea surface temperature, and 5) species name.
+
+With these data, the function must:
+
+1.  Ensure that all CRSs are the same for EEZ, SST, and depth.
+2.  Subtract 273.15 from the mean values of SST
+3.  Crop depth to the extent of SST.
+4.  Create matrix of max and min for SST and depth
+5.  Apply matrix to SST and depth raster
+6.  Multiply SST and depth suitable area rasters
+7.  Crop suitable area raster to EEZ.
+8.  Calculate zonal statistics for each EEZ based on suitable area.
+9.  Make map of suitable area in each zone as a color gradient.
+
+## EEZ Suitable area function
+
+```{r}
+# Mean SST pre calculated and 273.15 subtracted if in Kelvin
+eez_suitable_area <- function(mean_sst, bath, eez, min_sst, max_sst, min_depth, max_depth, species_name){
+  
+  # Reproject bathymetry to match the CRS of SST
+  if(crs(bath) == st_crs(mean_sst)){
+  print("Coordinate reference systems match.")
+}else{
+  warning("Updating coordinate reference systems to match.")
+  #transform data to match
+  bath_reproj <- st_transform(bath, crs(mean_sst))
+}
+  
+  # Crop bathymetry to match the extent of the SST raster
+  bath_crop <- crop(bath_reproj, mean_sst)
+  
+  # Ensure that resolutions match
+    # Reproject bathymetry to match the CRS of SST
+  if(res(bath_crop) == res(mean_sst)){
+  print("Spatial reoslutions match.")
+  }else{
+  warning("Updating resolutions to match.")
+  # Resample data to match
+  bath_aligned <- resample(bath_crop, y = sst_mean, method = "near")
+  }
+  
+  #
+
+}
+```
+
+Repeat process for ![](data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==)P.interruptus (California spiny lobster).
