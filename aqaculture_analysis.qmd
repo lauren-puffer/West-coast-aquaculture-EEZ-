@@ -16,17 +16,15 @@ theme: journal
 
 # Introduction
 
-# Data citations
+In this analysis, we want to determine the total area of suitable habitat in km2 for different marine species within Exclusive Economic Zones. Exclusive Economic Zones are areas that extend up to 200 nautical miles of the coast where a country has domain over the natural resources. The EEZs we will use for this analysis pertain to the West coast of the U.S. We want to better understand the potential for certain aquaculture ventures on the West Coast. We will use open-source data from three sources to obtain environmental and spatial data.
 
-Froese, R., & Pauly, D. (Eds.). (n.d.). *Panulirus interruptus* (Randall, 1840). SeaLifeBase. <https://www.sealifebase.ca/summary/Panulirus-interruptus.html>
+# Data citations
 
 GEBCO Compilation Group. (2025). *GEBCO 2025 grid* \[Data set\]. General Bathymetric Chart of the Oceans. <https://www.gebco.net/data-products/gridded-bathymetry-data>
 
 Flanders Marine Institute. (n.d.). *EEZ boundaries* \[Data set\]. Marine Regions. <https://www.marineregions.org/eez.php>
 
-Gentry, R. R., Froehlich, H. E., Grimm, D., Kareiva, P., Parke, M., Rust, M., Gaines, S. D., & Halpern, B. S. (2017). Mapping the global potential for marine aquaculture. *Nature Ecology & Evolution*, *1*(9), 1317–1324. <https://doi.org/10.1038/s41559-017-0257-9>
-
-Venter, L., Booth, A. J., & Merwe, M. V. D. (2008). The effect of temperature on the growth, survival and food consumption of the east coast rock lobster *Panulirus homarus rubellus*. *Aquaculture*, *280*(1–4), 227–231. <https://doi.org/10.1016/j.aquaculture.2008.05.002>
+Sea Life Base: <https://www.sealifebase.ca/search.php>
 
 # Load libraries
 
@@ -282,9 +280,46 @@ With these data, the function must:
 
 ## EEZ Suitable area function
 
+We will use the workflow above to create a function that is generalizable to any species. The only requirements are that average sea surface temperature ranges are provided in Celsisus and as a raster, bathymetry is provided in meters as a raster, and that EEZ is a shapefile. Any user-specified data (minimum and maximum depth and sea surface temperature) must be in meters and Celsisus respectively.
+
 ```{r}
 # Mean SST pre calculated and 273.15 subtracted if in Kelvin
 eez_suitable_area <- function(mean_sst, bath, eez, min_sst, max_sst, min_depth, max_depth, species_name){
+  
+  # Ensure that all parameter are present
+  if(missing(mean_sst)) stop("Error: 'mean_sst' argument is required")
+  if(missing(bath)) stop("Error: 'bath' (bathymetry) argument is required")
+  if(missing(eez)) stop("Error: 'eez' argument is required")
+  if(missing(min_sst)) stop("Error: 'min_sst' argument is required")
+  if(missing(max_sst)) stop("Error: 'max_sst' argument is required")
+  if(missing(min_depth)) stop("Error: 'min_depth' argument is required")
+  if(missing(max_depth)) stop("Error: 'max_depth' argument is required")
+  if(missing(species_name)) stop("Error: 'species_name' argument is required")
+  
+  
+  # Check that all data types are correct
+  if(!inherits(mean_sst, "SpatRaster")) {
+    stop("Error: 'mean_sst' must be a SpatRaster object")
+  }
+  if(!inherits(bath, "SpatRaster")) {
+    stop("Error: 'bath' must be a SpatRaster object")
+  }
+  if(!inherits(eez, c("sf", "sfc"))) {
+    stop("Error: 'eez' must be an sf or sfc object")
+  }
+  
+  # Check that numeric and character data are correct
+    # Check that numeric parameters are valid
+  if(!is.numeric(min_sst) || !is.numeric(max_sst)) {
+    stop("Error: min_sst and max_sst must be numeric values")
+  }
+  if(!is.numeric(min_depth) || !is.numeric(max_depth)) {
+    stop("Error: min_depth and max_depth must be numeric values")
+  }
+  if(!is.character(species_name)) {
+    stop("Error: species_name must be a character string")
+  }
+  
   
   # Reproject EEZ to match the CRS of SST
   eez_reproj <- st_transform(eez, crs(mean_sst))
@@ -392,7 +427,7 @@ eez_suitable_area(mean_sst = sst_c_mean, bath = bath, eez = eez,
 
 Next, we will repeat this entire process for the California spiny lobster.
 
-The California spiny lobster has an SST range between 10 to 21 Celsius and a depth range of 0 to 150 meters. We will use this information with our function to generate a map of suitable area for California spiny lobsters.
+The California spiny lobster has an SST range between 10 to 21 Celsius and a depth range of 0 to 150 meters. We will use this information with our function to generate a map of suitable area for California spiny lobsters. This information comes from the [Seal Life Base](https://www.sealifebase.ca/summary/Panulirus-interruptus.html) website and Venter et al. 2008.
 
 ```{r}
 # Plug California spiny lobsert information into 
@@ -413,3 +448,9 @@ Unsurprisingly, the range of suitable area in each EEZ is the same. While lobste
 Kolbert, J. (2015, April 2). Salmon and lobster aquaculture. *Bates College Biology Department*. <https://www.bates.edu/biology/2015/04/02/salmon-and-lobster-aquaculture/>
 
 NOAA Fisheries. (n.d.). *Commercial shellfish aquaculture on the West Coast*. <https://www.fisheries.noaa.gov/west-coast/aquaculture/commercial-shellfish-aquaculture-west-coast>
+
+Froese, R., & Pauly, D. (Eds.). (n.d.). *Panulirus interruptus* (Randall, 1840). SeaLifeBase. <https://www.sealifebase.ca/summary/Panulirus-interruptus.html>
+
+Gentry, R. R., Froehlich, H. E., Grimm, D., Kareiva, P., Parke, M., Rust, M., Gaines, S. D., & Halpern, B. S. (2017). Mapping the global potential for marine aquaculture. *Nature Ecology & Evolution*, *1*(9), 1317–1324. <https://doi.org/10.1038/s41559-017-0257-9>
+
+Venter, L., Booth, A. J., & Merwe, M. V. D. (2008). The effect of temperature on the growth, survival and food consumption of the east coast rock lobster *Panulirus homarus rubellus*. *Aquaculture*, *280*(1–4), 227–231. <https://doi.org/10.1016/j.aquaculture.2008.05.002>
