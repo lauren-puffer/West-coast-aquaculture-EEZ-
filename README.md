@@ -1,5 +1,7 @@
 # West Coast Aquaculture EEZ
 
+In this analysis, we want to determine the total area of suitable habitat in km2 for different marine species within Exclusive Economic Zones. Exclusive Economic Zones are areas that extend up to 200 nautical miles of the coast where a country has domain over the natural resources. The EEZs we will use for this analysis pertain to the West coast of the U.S. We want to better understand the potential for certain aquaculture ventures on the West Coast. We will use open-source data from three sources to obtain environmental and spatial data.
+
 ## Repository structure
 
 ```{r}
