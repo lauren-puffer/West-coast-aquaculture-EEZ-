@@ -16,6 +16,14 @@ theme: journal
 
 # Introduction
 
+# Data citations
+
+Froese, R., & Pauly, D. (Eds.). (n.d.). *Panulirus interruptus* (Randall, 1840). SeaLifeBase. <https://www.sealifebase.ca/summary/Panulirus-interruptus.html>
+
+GEBCO Compilation Group. (2025). *GEBCO 2025 grid* \[Data set\]. General Bathymetric Chart of the Oceans. <https://www.gebco.net/data-products/gridded-bathymetry-data>
+
+Flanders Marine Institute. (n.d.). *EEZ boundaries* \[Data set\]. Marine Regions. <https://www.marineregions.org/eez.php>
+
 # Load libraries
 
 ```{r}
@@ -191,7 +199,7 @@ plot(multiplied_crop)
 eez_rast <- rasterize(eez_proj, multiplied_crop, field = "area_km2")
 ```
 
-## Calculate zonal statistics 
+## Calculate zonal statistics
 
 ```{r}
 # Compue the area covered by each raster cell in km2
@@ -247,31 +255,122 @@ With these data, the function must:
 # Mean SST pre calculated and 273.15 subtracted if in Kelvin
 eez_suitable_area <- function(mean_sst, bath, eez, min_sst, max_sst, min_depth, max_depth, species_name){
   
+  # Reproject EEZ to match the CRS of SST
+  eez_reproj <- st_transform(eez, crs(mean_sst))
+  
   # Reproject bathymetry to match the CRS of SST
-  if(crs(bath) == st_crs(mean_sst)){
-  print("Coordinate reference systems match.")
-}else{
-  warning("Updating coordinate reference systems to match.")
-  #transform data to match
-  bath_reproj <- st_transform(bath, crs(mean_sst))
-}
+  bath_reproj <- project(bath, mean_sst)
   
   # Crop bathymetry to match the extent of the SST raster
   bath_crop <- crop(bath_reproj, mean_sst)
   
   # Ensure that resolutions match
-    # Reproject bathymetry to match the CRS of SST
-  if(res(bath_crop) == res(mean_sst)){
-  print("Spatial reoslutions match.")
-  }else{
-  warning("Updating resolutions to match.")
-  # Resample data to match
-  bath_aligned <- resample(bath_crop, y = sst_mean, method = "near")
-  }
+  sst_reproj <- resample(bath_crop, mean_sst, method = "near")
   
-  #
+  
+  # Build a raster for suitable temperature
+  # SST matrix
+  sst_matrix <- matrix(c(-Inf,min_sst, 0,
+                         min_sst, max_sst, 1, 
+                         max_sst, Inf, 0),
+                       ncol = 3, byrow = TRUE)
+  
+  # Depth matrix
+  depth_matrix <- matrix(c(-Inf, max_depth, 0, 
+                           max_depth, min_depth, 1, 
+                           min_depth, Inf, 0),
+                         ncol = 3, byrow = TRUE)
+  
+  
+  # Apply matrices to both rasters
+  sst_reclassified <- classify(sst_reproj, rcl = sst_matrix)
+  depth_reclassified <- classify(bath_reproj, rcl = depth_matrix)
+  
+  
+  # Multiply both cells to get the suitable cells
+  suitable_cells <- sst_reclassified * depth_reclassified
+  
+  
+  # Convert 0s to NAs
+  suitable_cells[suitable_cells == 0] <- NA
+  
+  
+  # Crop suitable cells to EEZ
+  suitable_cells_crop <- crop(suitable_cells, eez_reproj)
+  
+  
+  # Make an EEZ raster
+  eez_raster <- rasterize(eez_reproj, suitable_cells_crop, field = "area_km2")
+  
+  
+  # Get the cell size from the suitable_area_crop raster
+  suitable_cells_area <- cellSize(suitable_cells_crop,
+                                  mask = TRUE, 
+                                  lyrs = FALSE, 
+                                  unit = "km"
+                                  )
+  
+  
+  # Conduct zonal statistics using the area of suitable cells
+  zonal_suitable_cells <- zonal(suitable_cells_area, 
+                                eez_raster,
+                                  fun = "sum", 
+                                  na.rm = TRUE)
+  
+  
+  # Create a dataframe 
+  suitable_area_df <- cbind(eez, zonal_suitable_cells) |>
+    select(rgn, area_km2, area_km2.1) |>
+    rename(region = rgn, 
+         total_area = area_km2, 
+         suitable_area = area_km2.1)
+  
+  # Create tmap from dataframe
+  map_of_suitable_area <- tm_shape(suitable_area_df) +
+  tm_graticules() +
+  tm_polygons(
+    fill = "suitable_area",
+    fill.legend = tm_legend(
+      title = "Suitable Area (km²)",
+      position = tm_pos_out("right")
+    )
+  ) +
+  tm_title(paste("Area of suitable habitat for", species_name))
 
+  
+  # Call the map 
+  map_of_suitable_area
+  
 }
 ```
 
-Repeat process for ![](data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==)P.interruptus (California spiny lobster).
+Now we want to test this workflow for Oysters.
+
+```{r}
+# Pass the oyster information through the function
+# function(mean_sst, bath, eez, min_sst, max_sst, min_depth, max_depth, species_name
+eez_suitable_area(mean_sst = sst_c_mean, bath = bath, eez = eez,
+                  min_sst = 11, 
+                  max_sst = 30, 
+                  min_depth = 0, 
+                  max_depth = -70, 
+                  species_name = "Oyster")
+```
+
+# ![](data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==)P.interruptus (California spiny lobster)
+
+Next, we will repeat this entire process for the California spiny lobster.
+
+The California spiny lobster has an SST range between 10 to 21 Celsius and a depth range of 0 to 150 meters. We will use this information with our function to generate a map of suitable area for California spiny lobsters.
+
+```{r}
+# Plug California spiny lobsert information into 
+eez_suitable_area(mean_sst = sst_c_mean, bath = bath, eez = eez, 
+                  min_sst = 10, 
+                  max_sst = 21, 
+                  min_depth = 0, 
+                  max_depth = -150, 
+                  species_name = "California spiny lobster")
+```
+
+Unsurprisingly, the range of suitable area in each EEZ is the same. While lobsters have less range in their temperature threshold, they can live much deeper than oysters.
