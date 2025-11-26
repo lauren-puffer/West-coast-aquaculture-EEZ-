@@ -24,6 +24,10 @@ GEBCO Compilation Group. (2025). *GEBCO 2025 grid* \[Data set\]. General Bathyme
 
 Flanders Marine Institute. (n.d.). *EEZ boundaries* \[Data set\]. Marine Regions. <https://www.marineregions.org/eez.php>
 
+Gentry, R. R., Froehlich, H. E., Grimm, D., Kareiva, P., Parke, M., Rust, M., Gaines, S. D., & Halpern, B. S. (2017). Mapping the global potential for marine aquaculture. *Nature Ecology & Evolution*, *1*(9), 1317–1324. <https://doi.org/10.1038/s41559-017-0257-9>
+
+Venter, L., Booth, A. J., & Merwe, M. V. D. (2008). The effect of temperature on the growth, survival and food consumption of the east coast rock lobster *Panulirus homarus rubellus*. *Aquaculture*, *280*(1–4), 227–231. <https://doi.org/10.1016/j.aquaculture.2008.05.002>
+
 # Load libraries
 
 ```{r}
@@ -38,38 +42,25 @@ library(dplyr)
 
 # Load data
 
-SST files used:
-
--   `average_annual_sst_2008.tif`
-
--   `average_annual_sst_2009.tif`
-
--   `average_annual_sst_2010.tif`
-
--   `average_annual_sst_2011.tif`
-
--   `average_annual_sst_2012.tif`
-
-Bathymetry files used:
-
--   depth.tif
-
-## Exclusive Economic Zones
-
-Exclusive Economic Zones files used:
-
--   wc_regions_clean.shp
+The files we will be loading are mostly raster (annual sea surface temperature and bathymetry) and a shapefile with the boundaries of Exclusive Economic Zones.
 
 ```{r}
+#| message: false
+#| warning: false
+
 # Read in shapefile of EEZs
 eez <- st_read(here("data", "wc_regions_clean.shp"))
 ```
 
 ## Sea surface temperature
 
-```{r}
-# Read in rasters of sea surface temerpature
+The following files contain mean sea surface temperature across 5 different years from 2008 to 2012. These temperatures will be averaged later on in the analysis after stacking all 5 rasters.
 
+```{r}
+#| message: false
+#| warning: false
+
+# Read in rasters of sea surface temerpature
 sst_2008 <- rast(here("data", "average_annual_sst_2008.tif"))
 sst_2009 <- rast(here("data", "average_annual_sst_2009.tif"))
 sst_2010 <- rast(here("data", "average_annual_sst_2010.tif"))
@@ -79,18 +70,23 @@ sst_2012 <- rast(here("data", "average_annual_sst_2012.tif"))
 
 ## Bathymetry
 
+This raster conatins a grid profile of depths in the ocean. This will be important for selecting suitable area, given that most marine species have a depth range that they can live at.
+
 ```{r}
+#| message: false
+#| warning: false
+
 # read in raster for depth
 bath <- rast(here("data", "depth.tif"))
 ```
 
-## Oysters
+# Oysters
 
--   sea surface temperature: 11-30°C
-
--   depth: 0-70 meters below sea level
+To test that our analysis works, we will first perform our entire workflow for the depth and sea surface temperature range of oysters. Oysters have a temperature range of 11-30°C and a depth range of 0-70 meters below sea level. We will use these ranges to create a matrix and keep only pixels that fall within these values.
 
 ## Stack rasters
+
+Since all of our sea surface temperatures are across a time span of 5 years, we will have to stack the rasters and then get average values across the 5 years.
 
 ```{r}
 # Use c() to stack
@@ -101,7 +97,9 @@ sst_stack <- c(sst_2008,
               sst_2012)
 ```
 
-## Calculate mean
+## Calculate mean SST per cell
+
+Our grid cells are all in Kelvin and we need them to be in Celsius. After calculating the mean, we will subtract 273.15 from every grid.
 
 ```{r}
 # Get the mean of each of the cell values
@@ -113,7 +111,15 @@ sst_c_mean <- sst_mean - 273.15   # subtract 273.15 from every cell
 
 ## Reproject bathymetry
 
+Because bathymetry is not the same CRS as the sea surface temperature, we need to make sure that bathymetry is reprojected to match the mean sea surface temperature raster.
+
 ```{r}
+#| message: false
+#| warning: false
+
+# Check that bathymetry and SST are the same CRS
+crs(bath) == crs(sst_c_mean) # False!
+
 # Reproject to SST crs
 bath_reproj <- project(bath, crs(sst_c_mean))
 
@@ -121,9 +127,14 @@ bath_reproj <- project(bath, crs(sst_c_mean))
 crs(bath_reproj) == crs(sst_c_mean)
 ```
 
-Resample the bathymetry raster to the sea surface temperature.
+## Resample bathymetry data
+
+Now, we have to resample the bathymetry raster to match the resolution of the sea surface temperature raster. So that we can determine where suitable habitat overlaps.
 
 ```{r}
+#| message: false
+#| warning: false
+
 # Resample to SST
 bath_aligned <- resample(bath_reproj, sst_c_mean)
 
@@ -134,7 +145,7 @@ ext(bath_aligned) == ext(sst_c_mean)
 res(bath_aligned) == res(sst_2008)
 ```
 
-Create a matrix of oyster sea surface temperature threshold, and oyster depth range.
+We will bring in the species information by creating matrices of both the sea surface temperature threshold and depth range of oysters.
 
 ```{r}
 # Matrix of SST rang
@@ -155,7 +166,7 @@ depth_oyster_matrix <- matrix(c(
 )
 ```
 
-Reclassify the raster with the matrix.
+Now that we have matrices, we can reclassify the sea surface temperature and bathymetry raster data using the matrices.
 
 ```{r}
 # Reclassify
@@ -163,9 +174,12 @@ sst_reclassify <- classify(sst_c_mean, sst_osyter_matrix)
 bath_reclassify <- classify(bath_aligned, depth_oyster_matrix)
 ```
 
-Multiply the rasters by eachother.
+We need to multiply these two reclissified ratsers in order to identify the areas of suitable habitat for the species. This is because the grid cells with suitable depth and temperature are identified with a 1, and those that are not are identified with a 0. If we multiply these rasters, then we only keep the areas where suitable depth and temperature overlap.
 
 ```{r}
+#| message: false
+#| warning: false
+
 # Multiply the reclassified rasters by eachother
 multiplied <- sst_reclassify * bath_reclassify
 
@@ -176,9 +190,14 @@ multiplied[multiplied == 0 ] <- NA
 plot(multiplied)
 ```
 
-## Make a mask of EEZ
+## Tranform EEZs to match SST CRS
+
+We want to only include suitable cells that are contained in EEZs. We must ensure that the CRSs match before we perform and analysis with the EEZ shapefile and the multiplied raster.
 
 ```{r}
+#| message: false
+#| warning: false
+
 # Reproject EEZ to SST
 eez_proj <- st_transform(eez, crs(multiplied))
 
@@ -188,22 +207,29 @@ crs(multiplied) == crs(eez_proj)
 
 ## Crop suitable cells to EEZ
 
+The multiplied raster of suitable areas must be cropped to the boundary of the EEZs to identify areas within each EEZ that contain suitable habitat.
+
 ```{r}
+#| message: false
+#| warning: false
+
 # Crop suitable cells to EEZ
 multiplied_crop <- crop(multiplied, eez_proj)
 
 # Plot the cropped 
 plot(multiplied_crop)
-
-# Rasterize the EEZ
-eez_rast <- rasterize(eez_proj, multiplied_crop, field = "area_km2")
 ```
 
 ## Calculate zonal statistics
 
+The zonal statistics of the cropped suitable area must be calculated to get the total area of suitable cells in each EEZ. We will use the cellSize() function to calculate the cell size of each grid cell in kilometers
+
 ```{r}
 # Compue the area covered by each raster cell in km2
 multiplied_crop_area <- cellSize(multiplied_crop, mask = TRUE, unit = "km")
+
+# Rasterize the EEZ
+eez_rast <- rasterize(eez_proj, multiplied_crop, field = "area_km2")
 
 # Calculate zonal statistics of cropped raster with EEZ raster
 suitable_zonal <- zonal(multiplied_crop_area,eez_rast, fun = "sum", 
@@ -222,7 +248,12 @@ zones_clean <- zones_bind |>
 
 ## Map of suitable area per EEZ
 
+The goal of this visualization is to see how much suitable area in km2 for each Exclusive Economic Zone. We will create this map using the tmap package.
+
 ```{r}
+#| message: false
+#| warning: false
+
 # Make a map of suitable area within Economic Zones
 tm_shape(zones_clean)+
   tm_graticules()+
