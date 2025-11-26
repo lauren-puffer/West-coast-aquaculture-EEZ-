@@ -14,8 +14,6 @@ toc: TRUE
 theme: journal
 ---
 
-![](images/Screenshot 2025-11-25 at 8.24.54 PM.png)
-
 # Introduction
 
 In this analysis, we want to determine the total area of suitable habitat in km2 for different marine species within Exclusive Economic Zones. Exclusive Economic Zones are areas that extend up to 200 nautical miles of the coast where a country has domain over the natural resources. The EEZs we will use for this analysis pertain to the West coast of the U.S. We want to better understand the potential for certain aquaculture ventures on the West Coast. We will use open-source data from three sources to obtain environmental and spatial data.
@@ -113,7 +111,7 @@ sst_c_mean <- sst_mean - 273.15   # subtract 273.15 from every cell
 
 Because bathymetry is not the same CRS as the sea surface temperature, we need to make sure that bathymetry is reprojected to match the mean sea surface temperature raster.
 
-```{r}
+```{r results='hide'}
 #| message: false
 #| warning: false
 
@@ -131,7 +129,7 @@ crs(bath_reproj) == crs(sst_c_mean)
 
 Now, we have to resample the bathymetry raster to match the resolution of the sea surface temperature raster. So that we can determine where suitable habitat overlaps.
 
-```{r}
+```{r results='hide'}
 #| message: false
 #| warning: false
 
@@ -176,7 +174,7 @@ bath_reclassify <- classify(bath_aligned, depth_oyster_matrix)
 
 We need to multiply these two reclissified ratsers in order to identify the areas of suitable habitat for the species. This is because the grid cells with suitable depth and temperature are identified with a 1, and those that are not are identified with a 0. If we multiply these rasters, then we only keep the areas where suitable depth and temperature overlap.
 
-```{r}
+```{r results='hide'}
 #| message: false
 #| warning: false
 
@@ -185,16 +183,13 @@ multiplied <- sst_reclassify * bath_reclassify
 
 # Change multiplied raster 0's to NAs
 multiplied[multiplied == 0 ] <- NA
-
-# Plot suitable cells
-plot(multiplied)
 ```
 
 ## Tranform EEZs to match SST CRS
 
 We want to only include suitable cells that are contained in EEZs. We must ensure that the CRSs match before we perform and analysis with the EEZ shapefile and the multiplied raster.
 
-```{r}
+```{r results='hide'}
 #| message: false
 #| warning: false
 
@@ -209,15 +204,12 @@ crs(multiplied) == crs(eez_proj)
 
 The multiplied raster of suitable areas must be cropped to the boundary of the EEZs to identify areas within each EEZ that contain suitable habitat.
 
-```{r}
+```{r results='hide'}
 #| message: false
 #| warning: false
 
 # Crop suitable cells to EEZ
 multiplied_crop <- crop(multiplied, eez_proj)
-
-# Plot the cropped 
-plot(multiplied_crop)
 ```
 
 ## Calculate zonal statistics
@@ -250,7 +242,7 @@ zones_clean <- zones_bind |>
 
 The goal of this visualization is to see how much suitable area in km2 for each Exclusive Economic Zone. We will create this map using the tmap package.
 
-```{r}
+```{r results='hide'}
 #| message: false
 #| warning: false
 
