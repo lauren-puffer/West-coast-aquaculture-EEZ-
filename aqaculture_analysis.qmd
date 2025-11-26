@@ -1,7 +1,7 @@
 ---
 title: "EEZs for Aquaculture on the West Coast"
 author: "Lauren Puffer"
-date: "2025-11-09"
+date: "2025-11-25"
 format: html
 editor: visual
 embed-resources: true
@@ -404,4 +404,12 @@ eez_suitable_area(mean_sst = sst_c_mean, bath = bath, eez = eez,
                   species_name = "California spiny lobster")
 ```
 
-Unsurprisingly, the range of suitable area in each EEZ is the same. While lobsters have less range in their temperature threshold, they can live much deeper than oysters.
+# Reflection
+
+Unsurprisingly, the range of suitable area in each EEZ is the same. While lobsters have less range in their temperature threshold, they can live much deeper than oysters. It seems that the Washington and Southern California EEZs are the most optimal for spiny lobsters and oysters. While not much is know about the domestication and propagation of the spiny lobster, the success of the oyster in aquaculture operations is researched throughout the West coast (NOAA Fisheries, n.d.). In the Pacific Northwest for example, the shellfish industry generates \$270 million annually. Spiny lobster aquaculture has been successful in Vietnam, New Zealand, and Australia (Kolbert, 2015). Further research could investigate the methods for cultivating spiny lobster aquaculture, and the ultimate economic benefit of a such an operation.
+
+## References
+
+Kolbert, J. (2015, April 2). Salmon and lobster aquaculture. *Bates College Biology Department*. <https://www.bates.edu/biology/2015/04/02/salmon-and-lobster-aquaculture/>
+
+NOAA Fisheries. (n.d.). *Commercial shellfish aquaculture on the West Coast*. <https://www.fisheries.noaa.gov/west-coast/aquaculture/commercial-shellfish-aquaculture-west-coast>
