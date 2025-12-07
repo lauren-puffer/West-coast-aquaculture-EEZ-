@@ -6,7 +6,7 @@ format: html
 editor: visual
 embed-resources: true
 page-loading: false
-code-fold: show
+code-fold: hide
 execute: 
   warning: false
   message: false
@@ -14,19 +14,9 @@ toc: TRUE
 theme: journal
 ---
 
-# Introduction
+# Research Question
 
-In this analysis, we want to determine the total area of suitable habitat in km2 for different marine species within Exclusive Economic Zones. Exclusive Economic Zones are areas that extend up to 200 nautical miles of the coast where a country has domain over the natural resources. The EEZs we will use for this analysis pertain to the West coast of the U.S. We want to better understand the potential for certain aquaculture ventures on the West Coast. We will use open-source data from three sources to obtain environmental and spatial data.
-
-# Data citations
-
-GEBCO Compilation Group. (2025). *GEBCO 2025 grid* \[Data set\]. General Bathymetric Chart of the Oceans. <https://www.gebco.net/data-products/gridded-bathymetry-data>
-
-Flanders Marine Institute. (n.d.). *EEZ boundaries* \[Data set\]. Marine Regions. <https://www.marineregions.org/eez.php>
-
-Sea Life Base: <https://www.sealifebase.ca/search.php>
-
-# Load libraries
+In this analysis, we want to determine the total area of suitable habitat in km2 for oysters and Spiny lobsters within Exclusive Economic Zones. Exclusive Economic Zones are areas that extend up to 200 nautical miles of the coast where a country has domain over the natural resources. The EEZs we will use for this analysis pertain to the West coast of the U.S. We want to better understand the potential for certain aquaculture ventures on the West Coast. We will use open-source data from three sources to obtain environmental and spatial data.
 
 ```{r}
 library(tidyverse)
@@ -38,9 +28,7 @@ library(here)
 library(dplyr)
 ```
 
-# Load data
-
-The files we will be loading are mostly raster (annual sea surface temperature and bathymetry) and a shapefile with the boundaries of Exclusive Economic Zones.
+The data for this analysis comes mostly as raster data (annual sea surface temperature and bathymetry) and a single shapefile with the boundaries of Exclusive Economic Zones.
 
 ```{r}
 #| message: false
@@ -433,9 +421,17 @@ eez_suitable_area(mean_sst = sst_c_mean, bath = bath, eez = eez,
                   species_name = "California spiny lobster")
 ```
 
-# Reflection
+# Conclusion
 
 Unsurprisingly, the range of suitable area in each EEZ is the same. While lobsters have less range in their temperature threshold, they can live much deeper than oysters. It seems that the Washington and Southern California EEZs are the most optimal for spiny lobsters and oysters. While not much is know about the domestication and propagation of the spiny lobster, the success of the oyster in aquaculture operations is researched throughout the West coast (NOAA Fisheries, n.d.). In the Pacific Northwest for example, the shellfish industry generates \$270 million annually. Spiny lobster aquaculture has been successful in Vietnam, New Zealand, and Australia (Kolbert, 2015). Further research could investigate the methods for cultivating spiny lobster aquaculture, and the ultimate economic benefit of a such an operation.
+
+## Data citations
+
+GEBCO Compilation Group. (2025). *GEBCO 2025 grid* \[Data set\]. General Bathymetric Chart of the Oceans. <https://www.gebco.net/data-products/gridded-bathymetry-data>
+
+Flanders Marine Institute. (n.d.). *EEZ boundaries* \[Data set\]. Marine Regions. <https://www.marineregions.org/eez.php>
+
+Sea Life Base: <https://www.sealifebase.ca/search.php>
 
 ## References
 
