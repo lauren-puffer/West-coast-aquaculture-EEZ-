@@ -193,7 +193,7 @@ plot(multiplied,
      axes = TRUE)
 
 # Add caption
-mtext("Fig. 3 - Raster of suitable habitat areas by cell.", side = 1, line = 4, adj = 0.5)
+mtext("Fig. 4 - Raster of suitable habitat areas by cell.", side = 1, line = 4, adj = 0.5)
 ```
 
 ## Exclusive Economic Zones
@@ -227,7 +227,7 @@ tm_shape(eez_proj)+
             attr.outside = TRUE)
 ```
 
-Fig. 4 - EEZs on the West Coast of the U.S.
+Fig. 5 - EEZs on the West Coast of the U.S.
 
 ## Calculate zonal statistics
 
@@ -280,7 +280,7 @@ oyster_suitable_area
   
 ```
 
-Fig. 5 - Map of suitable habitat area in km\^2 for oysters per each Exclusive Economic Zone.
+Fig. 6 - Map of suitable habitat area in km\^2 for oysters per each Exclusive Economic Zone.
 
 # Function from suitable area workflow
 
