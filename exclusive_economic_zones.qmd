@@ -1,0 +1,498 @@
+---
+title: "EEZs for Aquaculture on the West Coast"
+author: "Lauren Puffer"
+date: "2025-12-06"
+format: html
+editor: visual
+embed-resources: true
+page-loading: false
+code-fold: true
+code-tools: false
+execute: 
+  warning: false
+  message: false
+toc: TRUE
+theme: journal
+---
+# Background
+As global demand for seafood continues to rise as the world population approaches 10 billion by 2050, wild fishery harvests have plateaued or declined in many regions. Marine aquaculture presents a unique opportunity to meet this growing protein demand sustainably.But where and how should the aquaculture industry expand production? Countries around the world have Exclusive Economic Zones; areas that extend up to 200 nautical miles of the coast where a country has domain over the natural resources in those waters. Understanding which Exclusive Economic Zones (EEZs) can viably support specific species is essential for the success of aquaculture. 
+
+# Research Question
+In order to determine the economic potential for aquaculture projects on the west coast, I visualized the total area of suitable habitat in km\^2 for both oysters and Spiny lobsters within Exclusive Economic Zones. The EEZs we will use for this analysis pertain to the West coast of the U.S. Because EEZs are within the domain of the U.S., the states themselves can determine whether or not to establish aquaculture operations off their coastlines. This analysis sheds light on the viability of specific species in the different EEZs. We want to better understand the potential for certain aquaculture ventures on the West Coast. We will use open-source data from three sources to obtain environmental and spatial data (see data citations)
+
+```{r}
+library(tidyverse)
+library(sf)
+library(terra)
+library(tmap)
+library(patchwork)
+library(here)
+library(dplyr)
+library(viridisLite)
+```
+
+[![Fig. 1 - Map of Exclusive Economic Zones worldwide. Image courtesy of Dr. Jean-Paul Rodriguez.](images/clipboard-3535465814.png)](https://transportgeography.org/wp-content/uploads/Map_Exclusive-Economic-Zones.pdf)
+
+The data for this analysis comes mostly as raster data (annual sea surface temperature and bathymetry) and a single shapefile with the boundaries of Exclusive Economic Zones. Raster data is much like a picture, as it is comprised of pixels. Each pixel in a raster has a corresponding value. Shape files merely contain the shapes of different areas of interest stored as polygons.
+
+```{r results='hide'}
+#| message: false
+#| warning: false
+
+# Read in shapefile of EEZs
+eez <- st_read(here("data", "wc_regions_clean.shp"))
+```
+
+# Factors determining viability
+
+## Sea surface temperature
+
+Sea surface temperature data across 5 different years (from 2008 to 2012) were stacked and averaged. This allowed me to include any areas with sea surface temperature falling in the tolerance range of the two different species. Cells with average temperatures outside of the species' tolerance range will not be included as suitable area.
+
+My grid cells were all in Kelvin and we need them to be in Celsius for my analysis. After calculating the mean, I subtracted 273.15 from every grid to get it into Celsisus.
+
+```{r}
+#| message: false
+#| warning: false
+
+# Read in rasters of sea surface temerpature
+sst_2008 <- rast(here("data", "average_annual_sst_2008.tif"))
+sst_2009 <- rast(here("data", "average_annual_sst_2009.tif"))
+sst_2010 <- rast(here("data", "average_annual_sst_2010.tif"))
+sst_2011 <- rast(here("data", "average_annual_sst_2011.tif"))
+sst_2012 <- rast(here("data", "average_annual_sst_2012.tif"))
+```
+
+```{r}
+# Use c() to stack
+sst_stack <- c(sst_2008, 
+              sst_2009, 
+              sst_2010,
+              sst_2011, 
+              sst_2012)
+```
+
+```{r}
+# Get the mean of each of the cell values
+sst_mean <- mean(sst_stack)
+
+# Globally subtract 273.15
+sst_c_mean <- sst_mean - 273.15   # subtract 273.15 from every cell
+
+# Plot the raster
+plot(sst_c_mean, 
+     col = viridis(256),
+     main = "Sea Surface Temperature (°C)",
+     axes = TRUE)
+
+# Add caption
+mtext("Fig. 2 - Raster of mean sea surface temperature in Celsius.", side = 1, line = 4, adj = 0.5)
+
+```
+
+## Bathymetry
+
+I used a raster of ocean depths to analyze the viability of species in specific EEZs according to the depth range of their suitable habitat. This was be important for selecting suitable area, given that most marine species have a depth range that they can live at.
+
+Every spatially referenced dataset has a "coordinate reference system" or CRS that corresponds with it. It is important when working iwth multiple datasets that the CRSs match, because if they don't you will not have the spatial overlap necessary to perform your analysis. Because bathymetry is not the same CRS as the sea surface temperature, I needed to make sure that bathymetry was reprojected to match the mean sea surface temperature raster.
+
+Another manipulation I performed was a simple resampling of the bathymetry raster to match the resolution of the sea surface temperature raster. This means I altered the data so that the pixels of each of these rasters were the same size so that they would overlap. This was an important manipulation because we want to know where suitable depth and temperature overlap, equaling an area with suitable habitat.
+
+```{r results='hide'}
+#| message: false
+#| warning: false
+
+# read in raster for depth
+bath <- rast(here("data", "depth.tif"))
+```
+
+```{r results='hide'}
+#| message: false
+#| warning: false
+
+# Check that bathymetry and SST are the same CRS
+crs(bath) == crs(sst_c_mean) # False!
+
+# Reproject to SST crs
+bath_reproj <- project(bath, crs(sst_c_mean))
+
+# Check that the rasters match
+crs(bath_reproj) == crs(sst_c_mean) # True!
+```
+
+```{r results='hide'}
+#| message: false
+#| warning: false
+
+# Resample to SST
+bath_aligned <- resample(bath_reproj, sst_c_mean)
+
+# Check the extent
+ext(bath_aligned) == ext(sst_c_mean)
+
+# Check the resolution
+res(bath_aligned) == res(sst_2008)
+
+# Plot the raster
+plot(bath_aligned, 
+     col = viridis(256),
+     main = "Ocean Depth (m)",
+     axes = TRUE)
+
+# Add caption
+mtext("Fig. 3 - Raster of elevation in meters. Sea level is at 0 meters.", side = 1, line = 4, adj = 0.5)
+```
+
+# Oysters
+
+To test that my analysis works, I performed my entire workflow for the depth and sea surface temperature range of oysters. Oyster aquaculture has been a successful business venture in many states since the 1950s (Botta et al., 2020). Oysters have a temperature range of 11-30°C and a depth range of 0-70 meters below sea level. I used these ranges to create matrices and used them to reclassiy my temperature and depth rasters.
+
+[![Photo courtesy of the Nature Conservancy](images/Buttermilk-Bay-Oysters-Aquaculture-Restoration.jpg)](https://www.nature.org/en-us/about-us/where-we-work/united-states/massachusetts/stories-in-massachusetts/aquaculture-oyster-restoration/)
+
+I needed to multiply these two reclassified rasters in order to identify the areas of suitable habitat for the species. This is because the grid cells with suitable depth and temperature are identified with a 1, and those that are not are identified with a 0. I multiplied these rasters to keep only the areas where suitable depth and temperature overlap. This gave me the pixels that contain suitable habitat for oysters.
+
+```{r}
+# Matrix of SST rang
+sst_osyter_matrix <- matrix(c(
+  -Inf, 11, 0,
+  11, 30, 1,
+  30, Inf, 0),
+ncol = 3,
+byrow = TRUE)
+  
+# Matrix of depth range
+depth_oyster_matrix <- matrix(c(
+  -Inf, -70, 0,
+  -70, 0, 1,
+  0, Inf, 0),
+  ncol = 3,
+  byrow = TRUE
+)
+```
+
+```{r}
+# Reclassify
+sst_reclassify <- classify(sst_c_mean, sst_osyter_matrix)
+bath_reclassify <- classify(bath_aligned, depth_oyster_matrix)
+```
+
+```{r results='hide'}
+#| message: false
+#| warning: false
+
+# Multiply the reclassified rasters by eachother
+multiplied <- sst_reclassify * bath_reclassify
+
+# Change multiplied raster 0's to NAs
+multiplied[multiplied == 0 ] <- NA
+
+# Plot the raster 
+plot(multiplied, 
+     col = viridis(256),
+     main = "Suitable habitat areas",
+     axes = TRUE)
+
+# Add caption
+mtext("Fig. 3 - Raster of suitable habitat areas by cell.", side = 1, line = 4, adj = 0.5)
+```
+
+## Exclusive Economic Zones
+
+In order to perform my analysis on how much area of suitable habitat is contained within each EEZ, I had to transform the CRS of the EEZ shapefile to match the suitable area raster I just made by multiplying the depth and temperature rasters. I then cropped the suitable area raster to my EEZ polygons to exclude any area outside of the EEZs.
+
+```{r results='hide'}
+#| message: false
+#| warning: false
+
+# Reproject EEZ to SST
+eez_proj <- st_transform(eez, crs(multiplied))
+
+# Check the CRS
+crs(multiplied) == crs(eez_proj)
+
+```
+
+```{r results='hide'}
+#| message: false
+#| warning: false
+
+# Crop suitable cells to EEZ
+multiplied_crop <- crop(multiplied, eez_proj)
+
+# Plot the raster
+tm_shape(eez_proj)+
+  tm_polygons() +
+  tm_title( text = "Exclusive Economic Zones")+
+  tm_layout(frame = FALSE, 
+            attr.outside = TRUE)
+```
+
+Fig. 4 - EEZs on the West Coast of the U.S.
+
+## Calculate zonal statistics
+
+To get the total area of suitable cells in each EEZ, I calculated the zonal statistics of the cropped suitable area. To do this I used the cellSize() function to calculate the cell size of each pixel in km\^2.
+
+```{r}
+# Compue the area covered by each raster cell in km2
+multiplied_crop_area <- cellSize(multiplied_crop, mask = TRUE, unit = "km")
+
+# Rasterize the EEZ
+eez_rast <- rasterize(eez_proj, multiplied_crop, field = "area_km2")
+
+# Calculate zonal statistics of cropped raster with EEZ raster
+suitable_zonal <- zonal(multiplied_crop_area,eez_rast, fun = "sum", 
+                        na.rm = TRUE) # remove NAs
+
+# Use cbin to bring in
+zones_bind <- cbind(eez_proj, suitable_zonal)
+
+# Keep only the useful columns
+zones_clean <- zones_bind |>
+  select(rgn, area_km2, area_km2.1) |>
+  rename(region = rgn, 
+         total_area = area_km2, 
+         area_suitable = area_km2.1)
+```
+
+## Map of suitable area per EEZ
+
+I wanted to create a visualization to see the amount of suitable habitat area (km\^2) in each zone for oysters. for each Exclusive Economic Zone. I created this using the tmap package. I used a color gradient to show the amount of suitable area in each zone.
+
+```{r}
+#| message: false
+#| warning: false
+
+# Make a map of suitable area within Economic Zones
+oyster_suitable_area <- tm_shape(zones_clean) +
+  tm_graticules() +
+  tm_polygons(
+    fill = "area_suitable",
+    fill.legend = tm_legend(
+      title = "Suitable Area (km²)",
+      position = tm_pos_out("right")
+    )
+  ) +
+  tm_title("Area of suitable habitat for Oysters")
+
+# Call the plot
+oyster_suitable_area
+  
+```
+
+Fig. 5 - Map of suitable habitat area in km\^2 for oysters per each Exclusive Economic Zone.
+
+# Function from suitable area workflow
+
+To make this a reproducible process, I created a generalizable function in order to get the suitable area per EEZ of any species I choose.
+
+To break down the process, my coded needed to...
+
+Take the inputs of 1) a raster with mean SST, 2) a raster of depth, 3) a shapefile, 4) max and min sst, 5) max and min sea surface temperature, and 5) species name.
+
+Th function that I created does the following:
+
+1.  Ensures that all CRSs are the same for EEZ, SST, and depth.
+2.  Subtracts 273.15 from the mean values of SST
+3.  Crops depth to the extent of SST.
+4.  Creates matrix of max and min for SST and depth
+5.  Applies matrix to SST and depth raster
+6.  Multiplies SST and depth suitable area rasters
+7.  Crops suitable area raster to EEZ.
+8.  Calculates zonal statistics for each EEZ based on suitable area.
+9.  Makes a map of suitable area in each zone as a color gradient.
+
+I used the workflow for my oyster analysis as a starting point to create my generalizable function. The only requirements are that average sea surface temperature ranges are provided in Celsisus and as a raster, bathymetry is provided in meters as a raster, and that EEZ is a shapefile. Any user-specified data (minimum and maximum depth and sea surface temperature) must be in meters and Celsisus respectively.
+
+```{r}
+#| code-fold: true
+#| code-summary: "Function for suitable area (km2) in EEZs"
+
+# Mean SST pre calculated and 273.15 subtracted if in Kelvin
+eez_suitable_area <- function(mean_sst, bath, eez, min_sst, max_sst, min_depth, max_depth, species_name){
+  
+  # Ensure that all parameter are present
+  if(missing(mean_sst)) stop("Error: 'mean_sst' argument is required")
+  if(missing(bath)) stop("Error: 'bath' (bathymetry) argument is required")
+  if(missing(eez)) stop("Error: 'eez' argument is required")
+  if(missing(min_sst)) stop("Error: 'min_sst' argument is required")
+  if(missing(max_sst)) stop("Error: 'max_sst' argument is required")
+  if(missing(min_depth)) stop("Error: 'min_depth' argument is required")
+  if(missing(max_depth)) stop("Error: 'max_depth' argument is required")
+  if(missing(species_name)) stop("Error: 'species_name' argument is required")
+  
+  
+  # Check that all data types are correct
+  if(!inherits(mean_sst, "SpatRaster")) {
+    stop("Error: 'mean_sst' must be a SpatRaster object")
+  }
+  if(!inherits(bath, "SpatRaster")) {
+    stop("Error: 'bath' must be a SpatRaster object")
+  }
+  if(!inherits(eez, c("sf", "sfc"))) {
+    stop("Error: 'eez' must be an sf or sfc object")
+  }
+  
+  # Check that numeric and character data are correct
+    # Check that numeric parameters are valid
+  if(!is.numeric(min_sst) || !is.numeric(max_sst)) {
+    stop("Error: min_sst and max_sst must be numeric values")
+  }
+  if(!is.numeric(min_depth) || !is.numeric(max_depth)) {
+    stop("Error: min_depth and max_depth must be numeric values")
+  }
+  if(!is.character(species_name)) {
+    stop("Error: species_name must be a character string")
+  }
+  
+  
+  # Reproject EEZ to match the CRS of SST
+  eez_reproj <- st_transform(eez, crs(mean_sst))
+  
+  # Reproject bathymetry to match the CRS of SST
+  bath_reproj <- project(bath, mean_sst)
+  
+  # Crop bathymetry to match the extent of the SST raster
+  bath_crop <- crop(bath_reproj, mean_sst)
+  
+  # Ensure that resolutions match
+  sst_reproj <- resample(bath_crop, mean_sst, method = "near")
+  
+  
+  # Build a raster for suitable temperature
+  # SST matrix
+  sst_matrix <- matrix(c(-Inf,min_sst, 0,
+                         min_sst, max_sst, 1, 
+                         max_sst, Inf, 0),
+                       ncol = 3, byrow = TRUE)
+  
+  # Depth matrix
+  depth_matrix <- matrix(c(-Inf, max_depth, 0, 
+                           max_depth, min_depth, 1, 
+                           min_depth, Inf, 0),
+                         ncol = 3, byrow = TRUE)
+  
+  
+  # Apply matrices to both rasters
+  sst_reclassified <- classify(sst_reproj, rcl = sst_matrix)
+  depth_reclassified <- classify(bath_reproj, rcl = depth_matrix)
+  
+  
+  # Multiply both cells to get the suitable cells
+  suitable_cells <- sst_reclassified * depth_reclassified
+  
+  
+  # Convert 0s to NAs
+  suitable_cells[suitable_cells == 0] <- NA
+  
+  
+  # Crop suitable cells to EEZ
+  suitable_cells_crop <- crop(suitable_cells, eez_reproj)
+  
+  
+  # Make an EEZ raster
+  eez_raster <- rasterize(eez_reproj, suitable_cells_crop, field = "area_km2")
+  
+  
+  # Get the cell size from the suitable_area_crop raster
+  suitable_cells_area <- cellSize(suitable_cells_crop,
+                                  mask = TRUE, 
+                                  lyrs = FALSE, 
+                                  unit = "km"
+                                  )
+  
+  
+  # Conduct zonal statistics using the area of suitable cells
+  zonal_suitable_cells <- zonal(suitable_cells_area, 
+                                eez_raster,
+                                  fun = "sum", 
+                                  na.rm = TRUE)
+  
+  
+  # Create a dataframe 
+  suitable_area_df <- cbind(eez, zonal_suitable_cells) |>
+    select(rgn, area_km2, area_km2.1) |>
+    rename(region = rgn, 
+         total_area = area_km2, 
+         suitable_area = area_km2.1)
+  
+  # Create tmap from dataframe
+  map_of_suitable_area <- tm_shape(suitable_area_df) +
+  tm_graticules() +
+  tm_polygons(
+    fill = "suitable_area",
+    fill.legend = tm_legend(
+      title = "Suitable Area (km²)",
+      position = tm_pos_out("right")
+    )
+  ) +
+  tm_title(paste("Area of suitable habitat for", species_name))
+
+  
+  # Call the map 
+  map_of_suitable_area
+  
+}
+```
+
+To make sure this function worked, I tested it on my oyster habitat specifications.
+
+```{r}
+# Pass the oyster information through the function
+# function(mean_sst, bath, eez, min_sst, max_sst, min_depth, max_depth, species_name
+eez_suitable_area(mean_sst = sst_c_mean, bath = bath, eez = eez,
+                  min_sst = 11, 
+                  max_sst = 30, 
+                  min_depth = 0, 
+                  max_depth = -70, 
+                  species_name = "Oyster")
+```
+
+# ![](data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==)P.interruptus (California spiny lobster)
+
+[![Photo courtesy of U.S. National Park Service](images/clipboard-3381024765.png)](https://www.nps.gov/places/california-spiny-lobster.htm)
+
+After testing my function, I repeated this entire process for the California spiny lobster.
+
+I chose to test the viability of the California spiny lobstern in these EEZs, because the spiny lobster is veyr popular amond Californians as a food source and a recreational fishing resource. I used the [Seal Life Base](https://www.sealifebase.ca/summary/Panulirus-interruptus.html) website and a paper by Venter et al. 2008 to find information on the habitat of the lobster. The California spiny lobster has a sea surface temperature range between 10 to 21 Celsius and a depth range of 0 to 150 meters. I ran this information through my function to generate a map of suitable area for California spiny lobsters.
+
+```{r}
+#| code-fold: true
+#| code-summary: "Suitable area (km2) for California Spiny lobster in EEZs"
+
+# Plug California spiny lobsert information into 
+eez_suitable_area(mean_sst = sst_c_mean, bath = bath, eez = eez, 
+                  min_sst = 10, 
+                  max_sst = 21, 
+                  min_depth = 0, 
+                  max_depth = -150, 
+                  species_name = "California spiny lobster")
+```
+
+# Conclusion
+
+Unsurprisingly, the range of suitable area in each EEZ is the same. While lobsters have less range in their temperature threshold, they can live much deeper than oysters. It seems that the Washington and Southern California EEZs are the most optimal for spiny lobsters and oysters. While not much is know about the domestication and propagation of the spiny lobster, the success of the oyster in aquaculture operations is researched throughout the West coast (NOAA Fisheries, n.d.). In the Pacific Northwest for example, the shellfish industry generates \$270 million annually. Spiny lobster aquaculture has been successful in Vietnam, New Zealand, and Australia (Kolbert, 2015). Further research could investigate the methods for cultivating spiny lobster aquaculture, and the ultimate economic benefit of a such an operation.
+
+## Data citations
+
+GEBCO Compilation Group. (2025). *GEBCO 2025 grid* \[Data set\]. General Bathymetric Chart of the Oceans. <https://www.gebco.net/data-products/gridded-bathymetry-data>
+
+Flanders Marine Institute. (n.d.). *EEZ boundaries* \[Data set\]. Marine Regions. <https://www.marineregions.org/eez.php>
+
+Sea Life Base: <https://www.sealifebase.ca/search.php>
+
+## References
+
+Kolbert, J. (2015, April 2). Salmon and lobster aquaculture. *Bates College Biology Department*. <https://www.bates.edu/biology/2015/04/02/salmon-and-lobster-aquaculture/>
+
+NOAA Fisheries. (n.d.). *Commercial shellfish aquaculture on the West Coast*. <https://www.fisheries.noaa.gov/west-coast/aquaculture/commercial-shellfish-aquaculture-west-coast>
+
+Froese, R., & Pauly, D. (Eds.). (n.d.). *Panulirus interruptus* (Randall, 1840). SeaLifeBase. <https://www.sealifebase.ca/summary/Panulirus-interruptus.html>
+
+Gentry, R. R., Froehlich, H. E., Grimm, D., Kareiva, P., Parke, M., Rust, M., Gaines, S. D., & Halpern, B. S. (2017). Mapping the global potential for marine aquaculture. *Nature Ecology & Evolution*, *1*(9), 1317–1324. <https://doi.org/10.1038/s41559-017-0257-9>
+
+Venter, L., Booth, A. J., & Merwe, M. V. D. (2008). The effect of temperature on the growth, survival and food consumption of the east coast rock lobster *Panulirus homarus rubellus*. *Aquaculture*, *280*(1–4), 227–231. <https://doi.org/10.1016/j.aquaculture.2008.05.002>
+
+Botta, Robert & Asche, Frank & Borsum, Scott. (2020). A review of global oyster aquaculture production and consumption. Marine Policy. 117. 103952. <https://doi.org/10.1016/j.marpol.2020.103952>
+
+
