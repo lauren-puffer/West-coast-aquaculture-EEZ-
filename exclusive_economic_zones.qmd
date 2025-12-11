@@ -277,6 +277,7 @@ oyster_suitable_area <- tm_shape(zones_clean) +
   tm_graticules() +
   tm_polygons(
     fill = "area_suitable",
+    fill.scale = tm_scale_continuous(values = "-viridis"),  # Add this line
     fill.legend = tm_legend(
       title = "Suitable Area (km²)",
       position = tm_pos_out("right")
@@ -434,6 +435,7 @@ eez_suitable_area <- function(mean_sst, bath, eez, min_sst, max_sst, min_depth, 
   tm_graticules() +
   tm_polygons(
     fill = "suitable_area",
+    fill.scale = tm_scale_continuous(values = "-viridis"),  # Add this line
     fill.legend = tm_legend(
       title = "Suitable Area (km²)",
       position = tm_pos_out("right")
