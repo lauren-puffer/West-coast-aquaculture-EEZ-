@@ -1,7 +1,7 @@
 ---
 title: "EEZs for Aquaculture on the West Coast"
 author: "Lauren Puffer"
-date: "2025-12-06"
+date: "2025-12-12"
 format: html
 editor: visual
 embed-resources: true
@@ -89,11 +89,9 @@ plot(sst_c_mean,
      col = viridis(256),
      main = "Sea Surface Temperature (°C)",
      axes = TRUE)
-
-# Add caption
-mtext("Fig. 2 - Raster of mean sea surface temperature in Celsius.", side = 1, line = 4, adj = 0.5)
-
 ```
+
+Fig. 2 - Raster of mean sea surface temperature in Celsius. The Western coast of the U.S. tends to be quite cold because of upwelling caused by Ekman Transport.
 
 ## Bathymetry
 
@@ -143,16 +141,15 @@ plot(bath_aligned,
      col = viridis(256),
      main = "Ocean Depth (m)",
      axes = TRUE)
-
-# Add caption
-mtext("Fig. 3 - Raster of elevation in meters. Sea level is at 0 meters.", side = 1, line = 4, adj = 0.5)
 ```
+
+Fig. 3 - Raster of elevation in meters. Sea level is at 0 meters. Darker areas indicate deeper waters and lighter areas indicate higher elevation.
 
 # Oysters
 
 To test that my analysis works, I performed my entire workflow for the depth and sea surface temperature range of oysters. Oyster aquaculture has been a successful business venture in many states since the 1950s (Botta et al., 2020). Oysters have a temperature range of 11-30°C and a depth range of 0-70 meters below sea level. This and other information about species habitat suitability can be found on the [Sea Life Base](https://www.sealifebase.ca/search.php). I used these ranges to create matrices and used them to reclassiy my temperature and depth rasters. What this does, is it turns all of the cells with values outside of the temperature and depth range into zeros and all of the values within the range into ones. Ones correspond with temperature or depth cells that are suitable for oysters, while zeros represent unsuitable depth or temperature.
 
-[![Photo courtesy of the Nature Conservancy](images/Buttermilk-Bay-Oysters-Aquaculture-Restoration.jpg)](https://www.nature.org/en-us/about-us/where-we-work/united-states/massachusetts/stories-in-massachusetts/aquaculture-oyster-restoration/)
+[![Photo courtesy of the Nature Conservancy. ](images/Buttermilk-Bay-Oysters-Aquaculture-Restoration.jpg)](https://www.nature.org/en-us/about-us/where-we-work/united-states/massachusetts/stories-in-massachusetts/aquaculture-oyster-restoration/)
 
 I needed to multiply these two reclassified rasters in order to identify the areas of suitable habitat for the species. This is because the grid cells with suitable depth and temperature are identified with a 1, and those that are not are identified with a 0. Any rasters that have unsuitable habitat for either depth or temperature become unsuitable habitat. I multiplied these rasters to keep only the areas where suitable depth and temperature overlap. This gave me the pixels that contain suitable habitat for oysters.
 
@@ -195,11 +192,18 @@ multiplied[multiplied == 0 ] <- NA
 plot(multiplied, 
      col = viridis(256),
      main = "Suitable habitat areas",
-     axes = TRUE)
+     axes = TRUE,
+     legend = FALSE)  # Turn off default legend
 
-# Add caption
-mtext("Fig. 4 - Raster of suitable habitat areas by cell.", side = 1, line = 4, adj = 0.5)
+# Add custom legend
+legend("right",
+       legend = "Suitable Area",
+       fill = viridis(1),
+       title = "Habitat",
+       bty = "n")  # Remove box around legend
 ```
+
+Fig. 4 - Raster of suitable habitat areas by cell. Areas indicated with a 1 are considered to be suitable habitat.
 
 ## Exclusive Economic Zones
 
@@ -232,7 +236,7 @@ tm_shape(eez_proj)+
             attr.outside = TRUE)
 ```
 
-Fig. 5 - EEZs on the West Coast of the U.S.
+Fig. 5 - EEZs boundaries on the West Coast of the U.S.. EEZs are pictured in grey.
 
 ## Calculate zonal statistics
 
@@ -262,7 +266,7 @@ zones_clean <- zones_bind |>
 
 ## Map of suitable area per EEZ
 
-I wanted to create a visualization to see the amount of suitable habitat area (km\^2) in each zone for oysters. for each Exclusive Economic Zone. I created this using the tmap package. I used a color gradient to show the amount of suitable area in each zone.
+I wanted to create a visualization to see the amount of suitable habitat area (km^2^) in each zone for oysters. for each Exclusive Economic Zone. I created this using the tmap package. I used a color gradient to show the amount of suitable area in each zone.
 
 ```{r}
 #| message: false
@@ -285,7 +289,7 @@ oyster_suitable_area
   
 ```
 
-Fig. 6 - Map of suitable habitat area in km\^2 for oysters per each Exclusive Economic Zone.
+Fig. 6 - Map of suitable habitat area in km^2^ for oysters per each Exclusive Economic Zone.
 
 # Function from suitable area workflow
 
@@ -308,6 +312,8 @@ Th function that I created does the following:
 9.  Makes a map of suitable area in each zone as a color gradient.
 
 I used the workflow for my oyster analysis as a starting point to create my generalizable function. The only requirements are that average sea surface temperature ranges are provided in Celsisus and as a raster, bathymetry is provided in meters as a raster, and that EEZ is a shapefile. Any user-specified data (minimum and maximum depth and sea surface temperature) must be in meters and Celsisus respectively.
+
+The function is called "eez_suitable_area()".
 
 To make sure this function worked, I tested it on my oyster habitat specifications.
 
@@ -453,6 +459,8 @@ eez_suitable_area(mean_sst = sst_c_mean, bath = bath, eez = eez,
                   species_name = "Oyster")
 ```
 
+Fig. 7 - Map of suitable habitat area in km^2^ for oysters per each Exclusive Economic Zone used as a test for function.
+
 After testing the function to see that the result matches the manual analysis I performed, I decided to try the function with depth and temperature range of a different species.
 
 # ![](data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==)
@@ -477,6 +485,8 @@ eez_suitable_area(mean_sst = sst_c_mean, bath = bath, eez = eez,
                   max_depth = -150, 
                   species_name = "California spiny lobster")
 ```
+
+Fig. 8 - Map of suitable habitat area in km^2^ for California spiny lobsters per each Exclusive Economic Zone on the West Coast.
 
 # Conclusion and Next Steps
 
