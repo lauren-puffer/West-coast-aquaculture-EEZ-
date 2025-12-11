@@ -14,11 +14,14 @@ execute:
 toc: TRUE
 theme: journal
 ---
+
 # Background
-As global demand for seafood continues to rise as the world population approaches 10 billion by 2050, wild fishery harvests have plateaued or declined in many regions. Marine aquaculture presents a unique opportunity to meet this growing protein demand sustainably.But where and how should the aquaculture industry expand production? Countries around the world have Exclusive Economic Zones; areas that extend up to 200 nautical miles of the coast where a country has domain over the natural resources in those waters. Understanding which Exclusive Economic Zones (EEZs) can viably support specific species is essential for the success of aquaculture. 
+
+As global demand for seafood continues to rise as the world population approaches 10 billion by 2050, wild fishery harvests have plateaued or declined in many regions. Marine aquaculture presents a unique opportunity to meet this growing protein demand sustainably. In 2018, farmed seafood outnumbered the amount of wild caught seafood in the market (*Aquaculture in California \| California Sea Grant*, n.d.). The aquaculture industry was responsible for 6,000 jobs jobs and \$885.7 million dolars worth of economic production (*California Aquaculture Association*, 2025). But where and how should the aquaculture industry expand production? Countries around the world have Exclusive Economic Zones; areas that extend up to 200 nautical miles of the coast where a country has domain over the natural resources in those waters. Understanding which Exclusive Economic Zones (EEZs) can viably support specific species is essential for the success of aquaculture.
 
 # Research Question
-In order to determine the economic potential for aquaculture projects on the west coast, I visualized the total area of suitable habitat in km\^2 for both oysters and Spiny lobsters within Exclusive Economic Zones. The EEZs we will use for this analysis pertain to the West coast of the U.S. Because EEZs are within the domain of the U.S., the states themselves can determine whether or not to establish aquaculture operations off their coastlines. This analysis sheds light on the viability of specific species in the different EEZs. We want to better understand the potential for certain aquaculture ventures on the West Coast. We will use open-source data from three sources to obtain environmental and spatial data (see data citations)
+
+In order to determine the economic potential for different aquaculture projects on the West coast, I wanted to create a function that generates a visual with the total area of suitable habitat in km^2^ for different species within Exclusive Economic Zones. This required me to use both [temperature](https://coralreefwatch.noaa.gov/product/5km/index_5km_ssta.php) and [depth](https://www.gebco.net/data-products/gridded-bathymetry-data) raster data to determine species viability in each zone. The [EEZ](Flanders Marine Institute. (n.d.). EEZ boundaries [Data set]. Marine Regions. https://www.marineregions.org/eez.php) shapefiles I used for this analysis pertain to the West coast of the U.S. Because EEZs are within the domain of the U.S., the states themselves can determine whether or not to establish aquaculture operations off their coastlines. This analysis sheds light on the viability of specific species to grow in the different EEZs, which in turn provides insight to their economic potential in the aquaculture industry.
 
 ```{r}
 library(tidyverse)
@@ -33,7 +36,9 @@ library(viridisLite)
 
 [![Fig. 1 - Map of Exclusive Economic Zones worldwide. Image courtesy of Dr. Jean-Paul Rodriguez.](images/clipboard-3535465814.png)](https://transportgeography.org/wp-content/uploads/Map_Exclusive-Economic-Zones.pdf)
 
-The data for this analysis comes mostly as raster data (annual sea surface temperature and bathymetry) and a single shapefile with the boundaries of Exclusive Economic Zones. Raster data is much like a picture, as it is comprised of pixels. Each pixel in a raster has a corresponding value. Shape files merely contain the shapes of different areas of interest stored as polygons.
+## Data types used
+
+The data for this analysis comes mostly as raster data (annual [sea surface temperature](https://coralreefwatch.noaa.gov/product/5km/index_5km_ssta.php) and [bathymetry](https://www.gebco.net/data-products/gridded-bathymetry-data)) and a single shapefile with the boundaries of [Exclusive Economic Zones](Flanders Marine Institute. (n.d.). EEZ boundaries [Data set]. Marine Regions. https://www.marineregions.org/eez.php). Each of these data come from NOAA, GEBCO, and Flanders Marine Institute respectively. **Raster data** is much like a picture, as it is comprised of pixels. Each pixel in a raster has a corresponding value. The raster data I used contains the mean annual sea surface temperature in Kelvin and bathymetry of the ocean in meters. **Shape files** merely contain the shapes of different areas of interest stored as polygons. The shapfiles I used in this analysis countain the borders of the EEZs on the West Coast.
 
 ```{r results='hide'}
 #| message: false
@@ -47,9 +52,9 @@ eez <- st_read(here("data", "wc_regions_clean.shp"))
 
 ## Sea surface temperature
 
-Sea surface temperature data across 5 different years (from 2008 to 2012) were stacked and averaged. This allowed me to include any areas with sea surface temperature falling in the tolerance range of the two different species. Cells with average temperatures outside of the species' tolerance range will not be included as suitable area.
+Mean sea surface temperature can vary annually. To avoid basing my entire analysis off of one year's worth of temperature data, mean anual sea surface temperature data across 5 different years (from 2008 to 2012) were stacked and averaged. Cells with average temperatures outside of the species' tolerance range will not be included as suitable area.
 
-My grid cells were all in Kelvin and we need them to be in Celsius for my analysis. After calculating the mean, I subtracted 273.15 from every grid to get it into Celsisus.
+My grid cells were all in Kelvin, but I wanted them to be in Celsius for my analysis. This is primarily because most people do not think in terms of Kelvin! After calculating the mean, I subtracted 273.15 from every grid to get it into Celsisus.
 
 ```{r}
 #| message: false
@@ -92,11 +97,11 @@ mtext("Fig. 2 - Raster of mean sea surface temperature in Celsius.", side = 1, l
 
 ## Bathymetry
 
-I used a raster of ocean depths to analyze the viability of species in specific EEZs according to the depth range of their suitable habitat. This was be important for selecting suitable area, given that most marine species have a depth range that they can live at.
+I used a raster of ocean depths to analyze the viability of species in specific EEZs according to the depth range of their suitable habitat. This was important for selecting suitable area, given that most marine species have a specific depth range that they can tolerate.
 
-Every spatially referenced dataset has a "coordinate reference system" or CRS that corresponds with it. It is important when working iwth multiple datasets that the CRSs match, because if they don't you will not have the spatial overlap necessary to perform your analysis. Because bathymetry is not the same CRS as the sea surface temperature, I needed to make sure that bathymetry was reprojected to match the mean sea surface temperature raster.
+Every dataset that contains information across space has a "coordinate reference system" or CRS that corresponds with it. The coordinate reference system allows spatial data to be contextualized by their position on the earth and the way the data was initially measured. Some spatial data is referenced using degrees, but some spatial data is references relatively using the distance, which is typically in meters. It is important when working with multiple datasets that the CRSs match, because if they don't you will not have the spatial overlap necessary to perform your analysis. Because bathymetry is not the same CRS as the sea surface temperature, I needed to make sure that bathymetry was **reprojected** to match the mean sea surface temperature raster. I preformed this reprojection with one line of code using the project() function.
 
-Another manipulation I performed was a simple resampling of the bathymetry raster to match the resolution of the sea surface temperature raster. This means I altered the data so that the pixels of each of these rasters were the same size so that they would overlap. This was an important manipulation because we want to know where suitable depth and temperature overlap, equaling an area with suitable habitat.
+Another manipulation I performed was a simple **resampling** of the bathymetry raster to match the resolution of the sea surface temperature raster. Resampling means making an alteration the data so that the pixels of each of these rasters were the same size so that they would overlap. This was an important manipulation because I wanted to know where suitable depth and temperature overlap to get areas with suitable habitat.
 
 ```{r results='hide'}
 #| message: false
@@ -145,11 +150,11 @@ mtext("Fig. 3 - Raster of elevation in meters. Sea level is at 0 meters.", side 
 
 # Oysters
 
-To test that my analysis works, I performed my entire workflow for the depth and sea surface temperature range of oysters. Oyster aquaculture has been a successful business venture in many states since the 1950s (Botta et al., 2020). Oysters have a temperature range of 11-30°C and a depth range of 0-70 meters below sea level. I used these ranges to create matrices and used them to reclassiy my temperature and depth rasters.
+To test that my analysis works, I performed my entire workflow for the depth and sea surface temperature range of oysters. Oyster aquaculture has been a successful business venture in many states since the 1950s (Botta et al., 2020). Oysters have a temperature range of 11-30°C and a depth range of 0-70 meters below sea level. This and other information about species habitat suitability can be found on the [Sea Life Base](https://www.sealifebase.ca/search.php). I used these ranges to create matrices and used them to reclassiy my temperature and depth rasters. What this does, is it turns all of the cells with values outside of the temperature and depth range into zeros and all of the values within the range into ones. Ones correspond with temperature or depth cells that are suitable for oysters, while zeros represent unsuitable depth or temperature.
 
 [![Photo courtesy of the Nature Conservancy](images/Buttermilk-Bay-Oysters-Aquaculture-Restoration.jpg)](https://www.nature.org/en-us/about-us/where-we-work/united-states/massachusetts/stories-in-massachusetts/aquaculture-oyster-restoration/)
 
-I needed to multiply these two reclassified rasters in order to identify the areas of suitable habitat for the species. This is because the grid cells with suitable depth and temperature are identified with a 1, and those that are not are identified with a 0. I multiplied these rasters to keep only the areas where suitable depth and temperature overlap. This gave me the pixels that contain suitable habitat for oysters.
+I needed to multiply these two reclassified rasters in order to identify the areas of suitable habitat for the species. This is because the grid cells with suitable depth and temperature are identified with a 1, and those that are not are identified with a 0. Any rasters that have unsuitable habitat for either depth or temperature become unsuitable habitat. I multiplied these rasters to keep only the areas where suitable depth and temperature overlap. This gave me the pixels that contain suitable habitat for oysters.
 
 ```{r}
 # Matrix of SST rang
@@ -198,7 +203,7 @@ mtext("Fig. 4 - Raster of suitable habitat areas by cell.", side = 1, line = 4, 
 
 ## Exclusive Economic Zones
 
-In order to perform my analysis on how much area of suitable habitat is contained within each EEZ, I had to transform the CRS of the EEZ shapefile to match the suitable area raster I just made by multiplying the depth and temperature rasters. I then cropped the suitable area raster to my EEZ polygons to exclude any area outside of the EEZs.
+In order to perform my analysis on how much area in km\^2 of suitable habitat is contained within each EEZ, I had to transform the Coordinate Reference System of the EEZ shapefile to match the suitable area raster I just made. After performing this reprojection, I then cropped the suitable area raster to my EEZ polygons to exclude any area outside of the EEZs. This allows me to focus only on cells with suitable habitat within the EEZ.
 
 ```{r results='hide'}
 #| message: false
@@ -231,7 +236,7 @@ Fig. 5 - EEZs on the West Coast of the U.S.
 
 ## Calculate zonal statistics
 
-To get the total area of suitable cells in each EEZ, I calculated the zonal statistics of the cropped suitable area. To do this I used the cellSize() function to calculate the cell size of each pixel in km\^2.
+To get the total area of suitable cells in each EEZ, I calculated the zonal statistics of the cropped suitable area. To do this I used the cellSize() function to calculate the total area of each pixel in km^2^ . I then used the zonal() function to get the sum of all suitable area in km^2^ in each EEZ. This gave me all of the information I needed to make a map with the amount of suitable area contained in each EEZ.
 
 ```{r}
 # Compue the area covered by each raster cell in km2
@@ -292,17 +297,19 @@ Take the inputs of 1) a raster with mean SST, 2) a raster of depth, 3) a shapefi
 
 Th function that I created does the following:
 
-1.  Ensures that all CRSs are the same for EEZ, SST, and depth.
-2.  Subtracts 273.15 from the mean values of SST
-3.  Crops depth to the extent of SST.
-4.  Creates matrix of max and min for SST and depth
-5.  Applies matrix to SST and depth raster
-6.  Multiplies SST and depth suitable area rasters
+1.  Ensures that all CRSs are the same for EEZ, sea surface temperature, and depth
+2.  Subtracts 273.15 from the mean values of sea surface temperature
+3.  Crops depth to the extent of sea surface temperature
+4.  Creates matrix of max and min for sea surface temperature and depth
+5.  Applies matrix to sea surface temperature and depth raster
+6.  Multiplies sea surface temperature and depth suitable area rasters
 7.  Crops suitable area raster to EEZ.
 8.  Calculates zonal statistics for each EEZ based on suitable area.
 9.  Makes a map of suitable area in each zone as a color gradient.
 
 I used the workflow for my oyster analysis as a starting point to create my generalizable function. The only requirements are that average sea surface temperature ranges are provided in Celsisus and as a raster, bathymetry is provided in meters as a raster, and that EEZ is a shapefile. Any user-specified data (minimum and maximum depth and sea surface temperature) must be in meters and Celsisus respectively.
+
+To make sure this function worked, I tested it on my oyster habitat specifications.
 
 ```{r}
 #| code-fold: true
@@ -435,8 +442,6 @@ eez_suitable_area <- function(mean_sst, bath, eez, min_sst, max_sst, min_depth, 
 }
 ```
 
-To make sure this function worked, I tested it on my oyster habitat specifications.
-
 ```{r}
 # Pass the oyster information through the function
 # function(mean_sst, bath, eez, min_sst, max_sst, min_depth, max_depth, species_name
@@ -448,13 +453,17 @@ eez_suitable_area(mean_sst = sst_c_mean, bath = bath, eez = eez,
                   species_name = "Oyster")
 ```
 
-# ![](data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==)P.interruptus (California spiny lobster)
+After testing the function to see that the result matches the manual analysis I performed, I decided to try the function with depth and temperature range of a different species.
+
+# ![](data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==)
+
+# P.interruptus (California spiny lobster)
 
 [![Photo courtesy of U.S. National Park Service](images/clipboard-3381024765.png)](https://www.nps.gov/places/california-spiny-lobster.htm)
 
 After testing my function, I repeated this entire process for the California spiny lobster.
 
-I chose to test the viability of the California spiny lobstern in these EEZs, because the spiny lobster is veyr popular amond Californians as a food source and a recreational fishing resource. I used the [Seal Life Base](https://www.sealifebase.ca/summary/Panulirus-interruptus.html) website and a paper by Venter et al. 2008 to find information on the habitat of the lobster. The California spiny lobster has a sea surface temperature range between 10 to 21 Celsius and a depth range of 0 to 150 meters. I ran this information through my function to generate a map of suitable area for California spiny lobsters.
+I chose to test the viability of the California spiny lobsters in these EEZs, because the spiny lobster is very popular among recreational and commercial fishers in California. It is the third most economically valuable species in the state of California (Aquarium of the Pacific, n.d.). This lobster has an extensive physical range and can be found from Monterey Bay to Baja California in Mexico (Neilson and Barsky, 2011). I used the [Seal Life Base](https://www.sealifebase.ca/summary/Panulirus-interruptus.html) website and a paper by Venter et al. 2008 to find information on the habitat of the lobster. The California spiny lobster has a sea surface temperature range between 10 to 21 Celsius and a depth range of 0 to 150 meters. I ran this information through my function to generate a map of suitable area for California spiny lobsters.
 
 ```{r}
 #| code-fold: true
@@ -469,9 +478,15 @@ eez_suitable_area(mean_sst = sst_c_mean, bath = bath, eez = eez,
                   species_name = "California spiny lobster")
 ```
 
-# Conclusion
+# Conclusion and Next Steps
 
-Unsurprisingly, the range of suitable area in each EEZ is the same. While lobsters have less range in their temperature threshold, they can live much deeper than oysters. It seems that the Washington and Southern California EEZs are the most optimal for spiny lobsters and oysters. While not much is know about the domestication and propagation of the spiny lobster, the success of the oyster in aquaculture operations is researched throughout the West coast (NOAA Fisheries, n.d.). In the Pacific Northwest for example, the shellfish industry generates \$270 million annually. Spiny lobster aquaculture has been successful in Vietnam, New Zealand, and Australia (Kolbert, 2015). Further research could investigate the methods for cultivating spiny lobster aquaculture, and the ultimate economic benefit of a such an operation.
+Unsurprisingly, the range of suitable area in each EEZ is the same. While lobsters have less range in their temperature threshold, they can live much deeper than oysters. It seems that the Washington and Southern California EEZs are the most optimal for spiny lobsters and oysters. While not much is known about the domestication and propagation of the spiny lobster, the success of the oyster in aquaculture operations is researched throughout the West coast (NOAA Fisheries, n.d.). In the Pacific Northwest for example, the shellfish industry generates \$270 million annually. Spiny lobster aquaculture has been successful in Vietnam, New Zealand, and Australia (Kolbert, 2015). Further research could investigate the methods for cultivating spiny lobster aquaculture, and the ultimate economic benefit of a such an operation.
+
+This broader applications of this function could be used as a tool to assess the feasibility of growing certain species in EEZs. However, this visulization is coarse and more granular information would be necessary to determine where operations should be placed within each EEZ depending on the species. The next part of my analysis will focus on visualizing the suitable area at a finer scale within each EEZ.
+
+## GitHub
+
+All of the information from this analysis can be found in the GitHub repository linked [here](https://github.com/lauren-puffer/West-coast-aquaculture-EEZ-/blob/main/README.md).
 
 ## Data citations
 
@@ -483,16 +498,22 @@ Sea Life Base: <https://www.sealifebase.ca/search.php>
 
 ## References
 
-Kolbert, J. (2015, April 2). Salmon and lobster aquaculture. *Bates College Biology Department*. <https://www.bates.edu/biology/2015/04/02/salmon-and-lobster-aquaculture/>
+*Aquaculture in California \| California Sea Grant*. (n.d.). Retrieved December 11, 2025, from <https://caseagrant.ucsd.edu/our-work/discover-california-seafood/aquaculture-california>
 
-NOAA Fisheries. (n.d.). *Commercial shellfish aquaculture on the West Coast*. <https://www.fisheries.noaa.gov/west-coast/aquaculture/commercial-shellfish-aquaculture-west-coast>
+Aquarium of the Pacific. (n.d.). *California spiny lobster*. Seafood for the Future. <https://www.aquariumofpacific.org/reportcard/info/california_spiny_lobster>
+
+Botta, Robert & Asche, Frank & Borsum, Scott. (2020). A review of global oyster aquaculture production and consumption. Marine Policy. 117. 103952. <https://doi.org/10.1016/j.marpol.2020.103952>
+
+*California Aquaculture Association*. (2025, August 6). Economic Contribution of Western U.S. States Aquaculture Quantified. *California Aquaculture Association*. <https://caaquaculture.org/2025/08/06/economic-contribution-of-western-u-s-states-aquaculture-quantified/>
 
 Froese, R., & Pauly, D. (Eds.). (n.d.). *Panulirus interruptus* (Randall, 1840). SeaLifeBase. <https://www.sealifebase.ca/summary/Panulirus-interruptus.html>
 
 Gentry, R. R., Froehlich, H. E., Grimm, D., Kareiva, P., Parke, M., Rust, M., Gaines, S. D., & Halpern, B. S. (2017). Mapping the global potential for marine aquaculture. *Nature Ecology & Evolution*, *1*(9), 1317–1324. <https://doi.org/10.1038/s41559-017-0257-9>
 
+Kolbert, J. (2015, April 2). Salmon and lobster aquaculture. *Bates College Biology Department*. <https://www.bates.edu/biology/2015/04/02/salmon-and-lobster-aquaculture/>
+
+Neilson, D.J. and Barsky, K.C. 2011. California Department of Fish and Wildlife. Status of the Fisheries Report: California Spiny Lobster, *Panuliris interruptus*. [nrm.dfg.ca.gov/FileHandler.ashx?DocumentID=65491&inline](http://nrm.dfg.ca.gov/FileHandler.ashx?DocumentID=65491&inline).
+
+NOAA Fisheries. (n.d.). *Commercial shellfish aquaculture on the West Coast*. <https://www.fisheries.noaa.gov/west-coast/aquaculture/commercial-shellfish-aquaculture-west-coast>
+
 Venter, L., Booth, A. J., & Merwe, M. V. D. (2008). The effect of temperature on the growth, survival and food consumption of the east coast rock lobster *Panulirus homarus rubellus*. *Aquaculture*, *280*(1–4), 227–231. <https://doi.org/10.1016/j.aquaculture.2008.05.002>
-
-Botta, Robert & Asche, Frank & Borsum, Scott. (2020). A review of global oyster aquaculture production and consumption. Marine Policy. 117. 103952. <https://doi.org/10.1016/j.marpol.2020.103952>
-
-
